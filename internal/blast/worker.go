@@ -12,9 +12,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-func NewWorker(wg *sync.WaitGroup, client *s3.Client, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) error {
+func NewWorker(wg *sync.WaitGroup, client *s3.Client, reducedRedundancy bool, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) error {
 	// check the client and bucket work
 	err := ping(client, bucket)
 	if err != nil {
@@ -25,7 +26,7 @@ func NewWorker(wg *sync.WaitGroup, client *s3.Client, bucket, prefix string, src
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		work(client, bucket, prefix, srcprefix, iChan, oChan)
+		work(client, reducedRedundancy, bucket, prefix, srcprefix, iChan, oChan)
 	}()
 
 	return nil
@@ -39,7 +40,7 @@ func ping(client *s3.Client, bucket string) error {
 	return err
 }
 
-func work(client *s3.Client, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) {
+func work(client *s3.Client, reducedRedundancy bool, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) {
 
 	ctx := context.Background()
 
@@ -71,7 +72,7 @@ func work(client *s3.Client, bucket, prefix string, srcprefix string, iChan <-ch
 		mdata["sha256"] = msg.Hash
 
 		// upload the file
-		size, err := upload(ctx, uploader, fpath, bucket, key, mdata)
+		size, err := upload(ctx, uploader, reducedRedundancy, fpath, bucket, key, mdata)
 
 		// pass on the result
 		oChan <- &Result{
@@ -84,7 +85,12 @@ func work(client *s3.Client, bucket, prefix string, srcprefix string, iChan <-ch
 	}
 }
 
-func upload(ctx context.Context, uploader *manager.Uploader, fpath, bucket, key string, mdata map[string]string) (uint64, error) {
+func upload(
+	ctx context.Context,
+	uploader *manager.Uploader,
+	reducedRedundancy bool,
+	fpath, bucket, key string,
+	mdata map[string]string) (uint64, error) {
 
 	// open the file for reading
 	freader, err := os.Open(fpath)
@@ -93,13 +99,19 @@ func upload(ctx context.Context, uploader *manager.Uploader, fpath, bucket, key 
 	}
 	defer freader.Close()
 
+	sclass := types.StorageClassStandard
+	if reducedRedundancy {
+		sclass = types.StorageClassReducedRedundancy
+	}
+
 	// uplaod the file
 	source := NewReadCounter(freader)
 	_, err = uploader.Upload(ctx, &s3.PutObjectInput{
-		Bucket:   aws.String(bucket),
-		Key:      aws.String(key),
-		Body:     source,
-		Metadata: mdata,
+		Bucket:       aws.String(bucket),
+		Key:          aws.String(key),
+		Body:         source,
+		Metadata:     mdata,
+		StorageClass: sclass,
 	})
 	if err != nil {
 		return 0, err

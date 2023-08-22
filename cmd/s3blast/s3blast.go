@@ -27,6 +27,7 @@ func main() {
 	profile := flag.String("p", "default", "aws s3 credentials profile")
 	nworkers := flag.Int("n", 2, "the number of upload workers")
 	ignoredot := flag.Bool("d", false, "ignore dot-files and dot-directories")
+	rredundancy := flag.Bool("r", false, "use reduced redundancy storage class")
 
 	flag.Parse()
 
@@ -69,7 +70,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = blast.NewWorker(&wg, client, bucket, keyprefix, srcroot, hoChan, woChan)
+		err = blast.NewWorker(&wg, client, *rredundancy, bucket, keyprefix, srcroot, hoChan, woChan)
 		if err != nil {
 			log.Fatal(err)
 		}
