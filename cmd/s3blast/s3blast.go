@@ -20,14 +20,15 @@ import (
 func main() {
 	// process the command line
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s  [-p <profile>] [-n <numworkers>] [-d] <files> <bucket>/<key-prefix>\n", filepath.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "Usage: %s  [options] <files> <bucket>/<key-prefix>\n", filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
 
 	profile := flag.String("p", "default", "aws s3 credentials profile")
-	nworkers := flag.Int("n", 2, "the number of upload workers")
-	ignoredot := flag.Bool("d", false, "ignore dot-files and dot-directories")
 	rredundancy := flag.Bool("r", false, "use reduced redundancy storage class")
+	ignoredot := flag.Bool("d", false, "ignore dot-files and dot-directories")
+	nworkers := flag.Int("w", 2, "the number of upload workers")
+	maxfiles := flag.Int("n", -1, "max number of files to upload")
 
 	flag.Parse()
 
@@ -55,7 +56,7 @@ func main() {
 	client := s3.NewFromConfig(cfg)
 
 	// create the file scanner
-	wiChan, err := blast.NewScanner(srcroot, *ignoredot)
+	wiChan, err := blast.NewScanner(srcroot, *ignoredot, *maxfiles)
 	if err != nil {
 		log.Fatal(err)
 	}

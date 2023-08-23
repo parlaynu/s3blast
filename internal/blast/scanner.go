@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func NewScanner(root string, ignoredot bool) (<-chan string, error) {
+func NewScanner(root string, ignoredot bool, maxfiles int) (<-chan string, error) {
 	// quick sanity check
 	info, err := os.Stat(root)
 	if err != nil {
@@ -25,21 +25,24 @@ func NewScanner(root string, ignoredot bool) (<-chan string, error) {
 	} else if info.Mode().IsDir() {
 		go func() {
 			defer close(ch)
-			scan(ch, root, ignoredot)
+			scan(ch, root, ignoredot, maxfiles, 0)
 		}()
 	}
 
 	return ch, nil
 }
 
-func scan(ch chan<- string, cdir string, ignoredot bool) {
+func scan(ch chan<- string, cdir string, ignoredot bool, maxfiles, curfiles int) int {
 	entries, err := os.ReadDir(cdir)
 	if err != nil {
 		log.Printf("failed to read dir %s with %s", cdir, err)
-		return
+		return curfiles
 	}
 
 	for _, entry := range entries {
+		if maxfiles > 0 && curfiles >= maxfiles {
+			break
+		}
 		if ignoredot && strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
@@ -48,8 +51,11 @@ func scan(ch chan<- string, cdir string, ignoredot bool) {
 
 		if entry.Type().IsRegular() {
 			ch <- fpath
+			curfiles += 1
 		} else if entry.Type().IsDir() {
-			scan(ch, fpath, ignoredot)
+			curfiles = scan(ch, fpath, ignoredot, maxfiles, curfiles)
 		}
 	}
+
+	return curfiles
 }
