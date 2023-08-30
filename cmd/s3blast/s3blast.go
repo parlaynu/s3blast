@@ -19,15 +19,15 @@ import (
 func main() {
 	// process the command line
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s  [options] <files> <s3url>\n", filepath.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] <files> <s3url>\n", filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
 
 	profile := flag.String("p", "default", "aws s3 credentials profile")
 	rredundancy := flag.Bool("r", false, "use reduced redundancy storage class")
 	ignoredot := flag.Bool("d", false, "ignore dot-files and dot-directories")
-	nworkers := flag.Int("w", 2, "the number of upload workers")
-	maxfiles := flag.Int("n", -1, "max number of files to upload")
+	nworkers := flag.Int("n", 2, "the number of upload workers")
+	maxfiles := flag.Int("c", -1, "max number of files to upload")
 
 	flag.Parse()
 

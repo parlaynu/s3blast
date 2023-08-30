@@ -37,19 +37,22 @@ If you can upload to the bucket using the AWS CLI, then this will work for you a
 
 The usage is:
 
-    Usage: s3blast  [-p <profile>] [-n <numworkers>] [-d] <files> <bucket>/<key-prefix>
+    Usage: s3blast [options] <files> <s3url>
+      -c int
+        	max number of files to upload (default -1)
       -d	ignore dot-files and dot-directories
       -n int
         	the number of upload workers (default 2)
       -p string
         	aws s3 credentials profile (default "default")
+      -r	use reduced redundancy storage class
 
 The file root can be a directory in which case it is traversed recursively looking for files. Or, it can be
 a single file.
 
 An example:
 
-    s3blast -p myprofile -n 4 ~/data mybucket/my/key/prefix/
+    s3blast -p myprofile -n 4 ~/data s3://mybucket/my/key/prefix/
 
 This will recursively search the directory `~/data` looking for files to upload. 
 
