@@ -14,7 +14,7 @@ func NewScanner(root string, ignoredot bool, maxfiles int) (<-chan string, error
 		return nil, err
 	}
 
-	ch := make(chan string, 1)
+	ch := make(chan string, 10)
 
 	if info.Mode().IsRegular() {
 		// a single file... put it on the channel immediately

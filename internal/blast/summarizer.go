@@ -51,7 +51,7 @@ type Summarizer struct {
 }
 
 func NewSummarizer(wg *sync.WaitGroup, verbose bool) (*Summarizer, chan<- *Result) {
-	rch := make(chan *Result, 1)
+	rch := make(chan *Result, 5)
 	s := &Summarizer{
 		verbose: verbose,
 		wg:      wg,
@@ -77,7 +77,7 @@ func (s *Summarizer) Run() {
 	done := make(chan bool)
 	go func() {
 		s.wg.Wait()
-		done <- true
+		close(done)
 	}()
 
 	// start running
