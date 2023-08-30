@@ -18,7 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-func NewWorker(wg *sync.WaitGroup, client *s3.Client, reducedRedundancy, overwrite bool, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) error {
+func NewWorker(wg *sync.WaitGroup, client *s3.Client, reducedRedundancy bool, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) error {
 	// check the client and bucket work
 	err := ping(client, bucket)
 	if err != nil {
@@ -29,7 +29,7 @@ func NewWorker(wg *sync.WaitGroup, client *s3.Client, reducedRedundancy, overwri
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		work(client, reducedRedundancy, overwrite, bucket, prefix, srcprefix, iChan, oChan)
+		work(client, reducedRedundancy, bucket, prefix, srcprefix, iChan, oChan)
 	}()
 
 	return nil
@@ -44,7 +44,7 @@ func ping(client *s3.Client, bucket string) error {
 	return err
 }
 
-func work(client *s3.Client, reducedRedundancy, overwrite bool, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) {
+func work(client *s3.Client, reducedRedundancy bool, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) {
 
 	ctx := context.Background()
 
@@ -98,22 +98,11 @@ func work(client *s3.Client, reducedRedundancy, overwrite bool, bucket, prefix s
 			}
 			continue
 		}
-		if exists && !overwrite {
-			// not uploading...
-			oChan <- &Result{
-				Action: SKIPPED,
-				Path:   fmt.Sprintf("%s/%s", bucket, key),
-				Hash:   msg.Hash,
-				Size:   0,
-				Error:  nil,
-			}
-			continue
-		}
 
 		// upload the file
 		action := UPLOADED
 		if exists {
-			action = OVERWROTE
+			action = UPDATED
 		}
 		size, err := upload(ctx, uploader, reducedRedundancy, fpath, bucket, key, mdata)
 		if err != nil {

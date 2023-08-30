@@ -12,18 +12,16 @@ type action int
 
 const (
 	UPLOADED action = iota
+	UPDATED
 	MATCHED
-	SKIPPED
-	OVERWROTE
 	FAILED
 )
 
 var (
 	actions = [...]string{
 		"UPLOADED",
+		"UPDATED",
 		"MATCHED",
-		"SKIPPED",
-		"OVERWROTE",
 		"FAILED",
 	}
 )
@@ -37,15 +35,14 @@ type Result struct {
 }
 
 type Summarizer struct {
-	StartTime      time.Time
-	EndTime        time.Time
-	TotalFiles     uint64
-	TotalUploaded  uint64
-	TotalMatched   uint64
-	TotalSkipped   uint64
-	TotalOverwrote uint64
-	TotalFailed    uint64
-	TotalBytes     uint64
+	StartTime     time.Time
+	EndTime       time.Time
+	TotalFiles    uint64
+	TotalUploaded uint64
+	TotalUpdated  uint64
+	TotalMatched  uint64
+	TotalFailed   uint64
+	TotalBytes    uint64
 
 	verbose bool
 
@@ -107,12 +104,11 @@ func (s *Summarizer) Run() {
 		case UPLOADED:
 			s.TotalUploaded += 1
 			s.TotalBytes += result.Size
+		case UPDATED:
+			s.TotalUpdated += 1
+			s.TotalBytes += result.Size
 		case MATCHED:
 			s.TotalMatched += 1
-		case SKIPPED:
-			s.TotalSkipped += 1
-		case OVERWROTE:
-			s.TotalOverwrote += 1
 		case FAILED:
 			s.TotalFailed += 1
 		}
@@ -139,10 +135,16 @@ func (s *Summarizer) Report() {
 	fmt.Printf("      runtime: %s sec\n", humanize.Comma(duration/1000.0))
 	fmt.Printf("  total files: %d\n", s.TotalFiles)
 	fmt.Printf("     uploaded: %d\n", s.TotalUploaded)
+	fmt.Printf("      updated: %d\n", s.TotalUpdated)
 	fmt.Printf("        bytes: %s\n", humanize.Bytes(s.TotalBytes))
 	fmt.Printf("      matched: %d\n", s.TotalMatched)
-	fmt.Printf("      skipped: %d\n", s.TotalSkipped)
-	fmt.Printf("    overwrote: %d\n", s.TotalOverwrote)
-	fmt.Printf("     failures: %d\n", s.TotalFailed)
+	fmt.Printf("       failed: %d\n", s.TotalFailed)
 	fmt.Printf("         rate: %s/s\n", humanize.Bytes(rate))
+}
+
+func (s *Summarizer) ExitStatus() int {
+	if s.TotalFailed == 0 {
+		return 0
+	}
+	return 1
 }

@@ -33,6 +33,23 @@ To run this tool, you will need:
 
 If you can upload to the bucket using the AWS CLI, then this will work for you as well.
 
+## Operation
+
+This tool is designed so it can be run multiple times over the same source and bucket/key and
+only new or modified files will be uploaded. 
+
+Note: it never deletes files in the bucket. 
+
+Fle contents are tracked using sha256 hashes. This hash of the file content is calculated during scanning
+of the source and is also stored in the object in S3 as custom metadata when it is uploaded.
+
+Files are only uploaded if they don't already exist in S3, or if the local and S3 content hashes
+don't match.
+
+Additionally, the exit status is zero if there were no failures, and non-zero if there were any failures. 
+You could use this, for example, in a bash script to keep repeating the upload until it completes 
+without failure.
+
 ## Usage
 
 The usage is:
@@ -46,6 +63,7 @@ The usage is:
       -p string
         	aws s3 credentials profile (default "default")
       -r	use reduced redundancy storage class
+      -v	verbose progress reporting
 
 The file root can be a directory in which case it is traversed recursively looking for files. Or, it can be
 a single file.
