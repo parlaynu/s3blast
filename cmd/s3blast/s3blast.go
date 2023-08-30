@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
-	"strings"
+	"regexp"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -20,7 +19,7 @@ import (
 func main() {
 	// process the command line
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s  [options] <files> <bucket>/<key-prefix>\n", filepath.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "Usage: %s  [options] <files> <s3url>\n", filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
 
@@ -39,14 +38,18 @@ func main() {
 	}
 
 	srcroot := flag.Arg(0)
+	s3url := flag.Arg(1)
 
-	s3path := flag.Arg(1)
-	s3tokens := strings.Split(s3path, "/")
-	bucket := s3tokens[0]
-	keyprefix := ""
-	if len(s3tokens) > 1 {
-		keyprefix = path.Join(s3tokens[1:len(s3tokens)]...)
+	// process the s3url
+	s3re := regexp.MustCompile("^s3://([^/]+)(/?)(.*)")
+
+	s3tokens := s3re.FindStringSubmatch(s3url)
+	if len(s3tokens) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: s3 url format must match: s3://bucket[/key/prefix/]\n")
+		os.Exit(1)
 	}
+	bucket := s3tokens[1]
+	keyprefix := s3tokens[3]
 
 	// create the client
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithSharedConfigProfile(*profile))

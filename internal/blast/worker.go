@@ -34,8 +34,9 @@ func NewWorker(wg *sync.WaitGroup, client *s3.Client, reducedRedundancy bool, bu
 
 func ping(client *s3.Client, bucket string) error {
 	_, err := client.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
-		Bucket: aws.String(bucket),
-		Prefix: aws.String(""),
+		Bucket:  aws.String(bucket),
+		Prefix:  aws.String(""),
+		MaxKeys: 1,
 	})
 	return err
 }
