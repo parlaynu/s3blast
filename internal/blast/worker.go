@@ -2,7 +2,9 @@ package blast
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,12 +12,13 @@ import (
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-func NewWorker(wg *sync.WaitGroup, client *s3.Client, reducedRedundancy bool, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) error {
+func NewWorker(wg *sync.WaitGroup, client *s3.Client, reducedRedundancy, overwrite bool, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) error {
 	// check the client and bucket work
 	err := ping(client, bucket)
 	if err != nil {
@@ -26,7 +29,7 @@ func NewWorker(wg *sync.WaitGroup, client *s3.Client, reducedRedundancy bool, bu
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		work(client, reducedRedundancy, bucket, prefix, srcprefix, iChan, oChan)
+		work(client, reducedRedundancy, overwrite, bucket, prefix, srcprefix, iChan, oChan)
 	}()
 
 	return nil
@@ -41,7 +44,7 @@ func ping(client *s3.Client, bucket string) error {
 	return err
 }
 
-func work(client *s3.Client, reducedRedundancy bool, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) {
+func work(client *s3.Client, reducedRedundancy, overwrite bool, bucket, prefix string, srcprefix string, iChan <-chan *Result, oChan chan<- *Result) {
 
 	ctx := context.Background()
 
@@ -72,18 +75,87 @@ func work(client *s3.Client, reducedRedundancy bool, bucket, prefix string, srcp
 
 		mdata["sha256"] = msg.Hash
 
-		// upload the file
-		size, err := upload(ctx, uploader, reducedRedundancy, fpath, bucket, key, mdata)
+		// check if the key exists and the hash matches
+		exists, matches, err := existsAndMatches(ctx, client, bucket, key, mdata["sha256"])
+		if err != nil {
+			oChan <- &Result{
+				Action: FAILED,
+				Path:   fmt.Sprintf("%s/%s", bucket, key),
+				Hash:   msg.Hash,
+				Size:   0,
+				Error:  err,
+			}
+			continue
+		}
+		if exists && matches {
+			// no need to upload again...
+			oChan <- &Result{
+				Action: MATCHED,
+				Path:   fmt.Sprintf("%s/%s", bucket, key),
+				Hash:   msg.Hash,
+				Size:   0,
+				Error:  nil,
+			}
+			continue
+		}
+		if exists && !overwrite {
+			// not uploading...
+			oChan <- &Result{
+				Action: SKIPPED,
+				Path:   fmt.Sprintf("%s/%s", bucket, key),
+				Hash:   msg.Hash,
+				Size:   0,
+				Error:  nil,
+			}
+			continue
+		}
 
-		// pass on the result
+		// upload the file
+		action := UPLOADED
+		if exists {
+			action = OVERWROTE
+		}
+		size, err := upload(ctx, uploader, reducedRedundancy, fpath, bucket, key, mdata)
+		if err != nil {
+			action = FAILED
+		}
 		oChan <- &Result{
-			Path:  fmt.Sprintf("%s/%s", bucket, key),
-			Hash:  msg.Hash,
-			Error: err,
-			Size:  size,
+			Action: action,
+			Path:   fmt.Sprintf("%s/%s", bucket, key),
+			Hash:   msg.Hash,
+			Size:   size,
+			Error:  err,
 		}
 
 	}
+}
+
+func existsAndMatches(ctx context.Context, client *s3.Client, bucket, key, hash string) (bool, bool, error) {
+
+	heo, err := client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err == nil {
+		hhash, ok := heo.Metadata["sha256"]
+
+		// the the hashes match...
+		if ok && hhash == hash {
+			return true, true, nil
+		}
+
+		// they don't match
+		return true, false, nil
+	}
+
+	// check for a not found error...
+	var responseError *awshttp.ResponseError
+	if errors.As(err, &responseError) && responseError.ResponseError.HTTPStatusCode() == http.StatusNotFound {
+		return false, false, nil
+	}
+
+	// it was some other sort of error, so return
+	return false, false, err
 }
 
 func upload(

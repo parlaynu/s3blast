@@ -26,8 +26,10 @@ func main() {
 	profile := flag.String("p", "default", "aws s3 credentials profile")
 	rredundancy := flag.Bool("r", false, "use reduced redundancy storage class")
 	ignoredot := flag.Bool("d", false, "ignore dot-files and dot-directories")
+	overwrite := flag.Bool("o", false, "overwrite existing key")
 	nworkers := flag.Int("n", 2, "the number of upload workers")
 	maxfiles := flag.Int("c", -1, "max number of files to upload")
+	verbose := flag.Bool("v", false, "verbose progress reporting")
 
 	flag.Parse()
 
@@ -66,7 +68,7 @@ func main() {
 
 	// use a waitgroup to signal the summarizer that all workers are done
 	var wg sync.WaitGroup
-	srizer, woChan := blast.NewSummarizer(&wg)
+	srizer, woChan := blast.NewSummarizer(&wg, *verbose)
 
 	// get the workers running
 	for i := 0; i < *nworkers; i++ {
@@ -74,7 +76,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = blast.NewWorker(&wg, client, *rredundancy, bucket, keyprefix, srcroot, hoChan, woChan)
+		err = blast.NewWorker(&wg, client, *rredundancy, *overwrite, bucket, keyprefix, srcroot, hoChan, woChan)
 		if err != nil {
 			log.Fatal(err)
 		}
