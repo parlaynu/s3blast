@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
@@ -24,6 +25,7 @@ func main() {
 	}
 
 	profile := flag.String("p", "default", "aws s3 credentials profile")
+	endpoint_url := flag.String("e", "", "endpoint url")
 	rredundancy := flag.Bool("r", false, "use reduced redundancy storage class")
 	ignoredot := flag.Bool("d", false, "ignore dot-files and dot-directories")
 	nworkers := flag.Int("n", 2, "the number of upload workers")
@@ -52,8 +54,8 @@ func main() {
 	bucket := s3tokens[1]
 	keyprefix := s3tokens[3]
 
-	// create the client
-	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithSharedConfigProfile(*profile))
+	// create the confit
+	cfg, err := s3Config(*profile, *endpoint_url)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -86,4 +88,24 @@ func main() {
 	srizer.Report()
 
 	os.Exit(srizer.ExitStatus())
+}
+
+func s3Config(profile, endpoint_url string) (aws.Config, error) {
+	var functions []func(*config.LoadOptions) error
+
+	if endpoint_url != "" {
+		resolver := aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				ep := aws.Endpoint{
+					URL: endpoint_url,
+				}
+				return ep, nil
+			},
+		)
+		functions = append(functions, config.WithEndpointResolverWithOptions(resolver))
+	}
+	functions = append(functions, config.WithSharedConfigProfile(profile))
+
+	cfg, err := config.LoadDefaultConfig(context.Background(), functions...)
+	return cfg, err
 }
