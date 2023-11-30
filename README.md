@@ -1,6 +1,6 @@
-# Upload Files to AWS S3 Bucket
+# AWS S3 and Cloudflare R2 Uploader
 
-A fairly simple application that uploads files from local storage to an S3 bucket. It scans a source
+A fairly simple application that uploads files from local storage to an S3 or R2 bucket. It scans a source
 directory recursively looking for files, and uploads whatever is found.
 
 It does two things to get uploads running in parallel:
@@ -31,6 +31,13 @@ To run this tool, you will need:
 * an s3 bucket
 * an AWS profile with permissions to upload to the bucket
 
+Or:
+
+* a Cloudflare account
+* an r3 bucket
+* permissions to upload to the bucket
+
+
 If you can upload to the bucket using the AWS CLI, then this will work for you as well.
 
 ## Operation
@@ -40,7 +47,7 @@ only new or modified files will be uploaded.
 
 Note: it never deletes files in the bucket. 
 
-Fle contents are tracked using sha256 hashes. This hash of the file content is calculated during scanning
+File contents are tracked using sha256 hashes. This hash of the file content is calculated during scanning
 of the source and is also stored in the object in S3 as custom metadata when it is uploaded.
 
 Files are only uploaded if they don't already exist in S3, or if the local and S3 content hashes
