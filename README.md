@@ -88,3 +88,27 @@ An equivalent upload command using the aws cli looks like this:
 
     aws --profile myprofile s3 cp --recursive ~/data s3://mybucket/my/key/prefix
 
+### R2 Profiles
+
+A profile for using a R2 bucket is more involved than for an S3 bucket as you need to specify a `url_endpoint`.
+
+The credentials file entry is the same as for S3, for example:
+
+    [my_r2_bucket]
+    aws_access_key_id = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    aws_secret_access_key = yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+
+The config entry is where you need to specify the `url_endpoint` and looks like this:
+
+    [profile my_r2_bucket]
+    output = json
+    region = auto
+    services = my_r2_bucket
+
+    [services my_r2_bucket]
+    s3 =
+      endpoint_url = https://zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz.r2.cloudflarestorage.com
+
+The credentials and account Id needed are all available from your Cloudflare console. 
+Documentation is [here](https://developers.cloudflare.com/r2/).
+
